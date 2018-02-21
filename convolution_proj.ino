@@ -1,17 +1,19 @@
-#include <LM35.h>
-
-
-// Code to use SoftwareSerial
 #include <SoftwareSerial.h>
+#include <WiFi.h>
+#include <WiFiUDP.h>
+#include<TimeLib.h>
+#include <Wire.h>
+#include <DS1307RTC.h>  // a basic DS1307 library that returns time as a time_t
+
 SoftwareSerial espSerial =  SoftwareSerial(2,3);      // arduino RX pin=2  arduino TX pin=3    connect the arduino RX pin to esp8266 module TX pin   -  connect the arduino TX pin to esp8266 module RX pin
 
-LM35 temp(A0);
-const  int irPin1 = A0;
-const int irPin2 = A1;
-const int ldrPin = A2;
-int ledPin = 9;
+const int irPin = 4;
+const int ldrPin = A0;
+const int ledPin = 12;
+const int ledPin2 = 11;
 
-String apiKey = "";     // replace with your channel's thingspeak WRITE API key
+
+String apiKey = "R5UF8A38H4O4UC54";     // replace with your channel's thingspeak WRITE API key
 String ssid="";    // Wifi network SSID
 String password ="";  // Wifi network password
 
@@ -79,13 +81,19 @@ void setup() {
   Serial.begin(9600); 
   
    pinMode(ledPin, OUTPUT);
-   pinMode(pirPin, INPUT);
+   pinMode(irPin, INPUT);
    pinMode(ldrPin, INPUT);       
   
   espSerial.begin(9600);  // enable software serial
                           // Your esp8266 module's speed is probably at 115200. 
                           // For this reason the first time set the speed to 115200 or to your esp8266 configured speed 
                           // and upload. Then change to 9600 and upload again
+  while (!Serial) ; // Needed for Leonardo only
+  setSyncProvider(RTC.get);   // the function to get the time from the RTC
+  if (timeStatus() != timeSet) 
+     Serial.println("Unable to sync with the RTC");
+  else
+     Serial.println("RTC has set the system time");   
   
   espSerial.println("AT+RST");         // Enable this line to reset the module;
   showResponse(1000);
@@ -101,7 +109,7 @@ void setup() {
   espSerial.println("AT+CWJAP=\""+ssid+"\",\""+password+"\"");  // set your home router SSID and password
   showResponse(5000);
 
-   if (DEBUG)  Serial.println("Setup completed");
+  if (DEBUG)  Serial.println("Setup completed");
 }
 
 
@@ -109,60 +117,80 @@ void setup() {
 void loop() {
 
   // Read sensor values
-   int irStatus1 = digitalRead(irPin1);
+   int irStatus1 = digitalRead(irPin);
    int ldrStatus = analogRead(ldrPin);
-   int irStatus2 = digitalRead(irPin2);
-   
-   float mv = val* (5000/1024); 
-   float celcious =( 500 - mv)/10; 
-   float q = celcious;
-   float t = temp.cel();
-        if (isnan(t) ) {
-        if (DEBUG) Serial.println("Failed to read from LM35");
-      }
-      else {
-          if (DEBUG)  Serial.println("Temp="+String(t)+" *C");
-          
-           thingSpeakWrite(t);                                      // Write values to thingspeak
-      }
-  
-  if (irStatus1 == LOW)
-  {
-    Serial.println("Motion detected. Turning on lights");
-    digitalWrite(LED, HIGH);
-  }
-  else
-  {
-    Serial.println("clear");
-  }
- }
+    if (Serial.available()) {
+    time_t t = processSyncMessage();
+    if (t != 0) {
+      RTC.set(t);   // set the RTC and the system time to the received value
+      setTime(t);          
+    }
+  }
+  digitalClockDisplay();  
+  delay(1000);
 
-if (irStatus2 == LOW)
-  {
-    Serial.println("Motion detected. Turning off lights");
-    digitalWrite(LED, LOW);
-  }
-  else
-  {
-    Serial.println("clear");
-  }
- }
-
-  
-  if(ldrStatus >=300) {
-  digitalWrite(ledPin, LOW);
+    
+  if(ldrStatus <=300) {             //controlling led using ldr sensor
+  digitalWrite(ledPin, HIGH);
+  digitalWrite(ledPin2, HIGH);
   Serial.println("LDR is DARK, LED is ON");
+  thingSpeakWrite(1);
   }
 
   else {
-  digitalWrite(ledPin, HIGH);
+  digitalWrite(ledPin, LOW);
+   digitalWrite(ledPin2, LOW);
   Serial.println("---------------");
   }
-    
-  // thingspeak needs 15 sec delay between updates,     
-  delay(6000);  
+  
+/*  if (irStatus1 == LOW)
+  {
+    Serial.println("Motion detected. Turning on lights");
+    digitalWrite(ledPin, HIGH);
+    thingSpeakWrite(1);
+  }
+  else
+  {
+    Serial.println("clear");
+  }
+ 
+*/ 
+}
+void digitalClockDisplay(){
+  // digital clock display of the time
+  Serial.print(hour());
+  printDigits(minute());
+  printDigits(second());
+  Serial.print(" ");
+  Serial.println(); 
+}
+void printDigits(int digits){
+  // utility function for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if(digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+/*  code to process time sync messages from the serial port   */
+#define TIME_HEADER  "T"   // Header tag for serial time sync message
+
+unsigned long processSyncMessage() {
+  unsigned long pctime = 0L;
+  const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013 
+
+  if(Serial.find(TIME_HEADER)) {
+     pctime = Serial.parseInt();
+     return pctime;
+     if( pctime < DEFAULT_TIME) { // check the value is a valid time (greater than Jan 1 2013)
+       pctime = 0L; // return 0 to indicate that the time is not valid
+     }
+  }
+  return pctime;
 }
 
 
 
- 
+
+
+
