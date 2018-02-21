@@ -11,11 +11,12 @@ const int irPin = 4;
 const int ldrPin = A0;
 const int ledPin = 12;
 const int ledPin2 = 11;
-
+int val=0;
+int state=LOW;
 
 String apiKey = "R5UF8A38H4O4UC54";     // replace with your channel's thingspeak WRITE API key
-String ssid="";    // Wifi network SSID
-String password ="";  // Wifi network password
+String ssid="Shreya";    // Wifi network SSID
+String password ="wgbx03510";  // Wifi network password
 
 boolean DEBUG=true;
 
@@ -81,6 +82,7 @@ void setup() {
   Serial.begin(9600); 
   
    pinMode(ledPin, OUTPUT);
+   pinMode(ledPin2, OUTPUT);
    pinMode(irPin, INPUT);
    pinMode(ldrPin, INPUT);       
   
@@ -88,13 +90,7 @@ void setup() {
                           // Your esp8266 module's speed is probably at 115200. 
                           // For this reason the first time set the speed to 115200 or to your esp8266 configured speed 
                           // and upload. Then change to 9600 and upload again
-  while (!Serial) ; // Needed for Leonardo only
-  setSyncProvider(RTC.get);   // the function to get the time from the RTC
-  if (timeStatus() != timeSet) 
-     Serial.println("Unable to sync with the RTC");
-  else
-     Serial.println("RTC has set the system time");   
-  
+ 
   espSerial.println("AT+RST");         // Enable this line to reset the module;
   showResponse(1000);
 
@@ -117,7 +113,7 @@ void setup() {
 void loop() {
 
   // Read sensor values
-   int irStatus1 = digitalRead(irPin);
+   
    int ldrStatus = analogRead(ldrPin);
     if (Serial.available()) {
     time_t t = processSyncMessage();
@@ -141,20 +137,31 @@ void loop() {
   digitalWrite(ledPin, LOW);
    digitalWrite(ledPin2, LOW);
   Serial.println("---------------");
+  thingSpeakWrite(0);
   }
   
-/*  if (irStatus1 == LOW)
-  {
-    Serial.println("Motion detected. Turning on lights");
-    digitalWrite(ledPin, HIGH);
-    thingSpeakWrite(1);
-  }
-  else
-  {
-    Serial.println("clear");
+  val = digitalRead(irPin);   // read sensor value
+  if (val == HIGH) {           // check if the sensor is HIGH
+    digitalWrite(ledPin, HIGH);  // turn LED ON
+    digitalWrite(ledPin2, HIGH);
+    delay(5000);                // delay 100 milliseconds 
+    
+    if (state == LOW) {
+      Serial.println("Motion detected!"); 
+      state = HIGH;       // update variable state to HIGH
+    }
+  } 
+  else {
+      digitalWrite(ledPin, LOW); // turn LED OFF
+      digitalWrite(ledPin2, LOW);
+      delay(200);             // delay 200 milliseconds 
+      
+      if (state == HIGH){
+        Serial.println("Motion stopped!");
+        state = LOW;       // update variable state to LOW
+    }
   }
  
-*/ 
 }
 void digitalClockDisplay(){
   // digital clock display of the time
