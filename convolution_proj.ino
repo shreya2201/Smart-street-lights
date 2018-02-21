@@ -14,9 +14,9 @@ const int ledPin2 = 11;
 int val=0;
 int state=LOW;
 
-String apiKey = "R5UF8A38H4O4UC54";     // replace with your channel's thingspeak WRITE API key
-String ssid="Shreya";    // Wifi network SSID
-String password ="wgbx03510";  // Wifi network password
+String apiKey = "";     // replace with your channel's thingspeak WRITE API key
+String ssid="";    // Wifi network SSID
+String password ="";  // Wifi network password
 
 boolean DEBUG=true;
 
